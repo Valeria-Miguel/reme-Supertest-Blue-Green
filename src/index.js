@@ -67,3 +67,9 @@ if (require.main === module) {
 } else {
   module.exports = app;
 }
+
+// Sirve el frontend estático
+app.use(express.static('/frontend'));
+app.get('*', (req, res) => {
+  res.sendFile('/frontend/index.html');
+});
