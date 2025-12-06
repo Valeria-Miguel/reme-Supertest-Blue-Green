@@ -16,9 +16,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      - run: npm ci
-      - run: npm run lint || true
-      - run: npm test
+      - name: Install deps
+        run: npm ci
+      - name: Lint (no rompe el pipeline)
+        run: npm run lint || true
+      - name: Run tests
+        run: npm test
 
   build-and-push:
     name: Build and push image to GHCR
@@ -30,12 +33,16 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v2
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v4
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: true
@@ -48,6 +55,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+
       - name: SSH to VPS and deploy backend
         uses: appleboy/ssh-action@master
         with:
@@ -57,10 +65,14 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             set -e
+
             cd ${{ secrets.APP_PATH }}
             IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
 
-            # Detectar entorno activo
+            echo "Pulling latest image from GHCR..."
+            docker pull $IMAGE
+
+            # Detectar entorno activo leyendo el puerto del upstream de Nginx
             ACTIVE_PORT=$(grep -o "300[12]" /etc/nginx/sites-available/app.conf | head -1 || echo "3001")
 
             if [ "$ACTIVE_PORT" = "3001" ]; then
@@ -75,17 +87,24 @@ jobs:
 
             echo "Deploying $NEW on port $NEW_PORT"
 
-            # Liberar puerto si está ocupado por cualquier contenedor
-            # Liberar puerto si está ocupado por cualquier contenedor
+            # Liberar el puerto si está ocupado por cualquier contenedor
             OCCUPIED=$(docker ps -q --filter "publish=$NEW_PORT")
             if [ -n "$OCCUPIED" ]; then
+              echo "Port $NEW_PORT in use, removing container(s): $OCCUPIED"
               docker rm -f $OCCUPIED
             fi
 
-
+            # Borrar contenedor viejo de ese color si existe
             docker rm -f $NEW_CONTAINER 2>/dev/null || true
-            docker run -d --name $NEW_CONTAINER -p $NEW_PORT:3000 --restart unless-stopped $IMAGE
 
+            # Levantar nuevo contenedor
+            docker run -d \
+              --name $NEW_CONTAINER \
+              -p $NEW_PORT:3000 \
+              --restart unless-stopped \
+              $IMAGE
+
+            echo "Waiting for container health..."
             sleep 8
 
             chmod +x scripts/switch.sh scripts/rollback.sh
@@ -98,4 +117,3 @@ jobs:
               bash scripts/rollback.sh
               exit 1
             fi
-
