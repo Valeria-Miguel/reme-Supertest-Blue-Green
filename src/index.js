@@ -20,7 +20,7 @@ let fruits = [
 app.get('/', (req, res) => {
   res.json({
     status: 'OK',
-    message: 'Backend reme-Supertest-Blue-Green funcionando detrás de Nginx',
+    message: 'Backend reme-Supertest-Blue-Green funcionando ooi',
     version: 'dev'
   });
 });
