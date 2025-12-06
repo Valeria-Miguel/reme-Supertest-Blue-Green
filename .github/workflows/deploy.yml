@@ -88,12 +88,14 @@ jobs:
 
             sleep 8
 
+            chmod +x scripts/switch.sh scripts/rollback.sh
+
             if curl -sf http://127.0.0.1:$NEW_PORT/health; then
               echo "Healthy → switching to $NEW"
-              ./scripts/switch.sh $NEW
+              bash scripts/switch.sh $NEW
             else
               echo "Health failed → rollback"
-              ./scripts/rollback.sh
+              bash scripts/rollback.sh
               exit 1
             fi
 
