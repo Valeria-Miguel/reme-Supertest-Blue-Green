@@ -30,10 +30,13 @@ sleep 8
 
 # Healthcheck contra el puerto del host
 if curl -sf http://127.0.0.1:$PORT/health; then
-  echo "Healthy → switching"
-  ./scripts/switch.sh $ENV
+  echo "Healthy → switching to $ENV"
+  bash ./scripts/switch.sh $ENV
 else
-  echo "Health failed"
+  echo "Health check failed. Showing logs..."
   docker logs $CONTAINER --tail 50
+  echo "Rolling back to blue..."
+  bash ./scripts/rollback.sh
   exit 1
 fi
+
