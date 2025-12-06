@@ -59,12 +59,18 @@ if (!isTest && isDirectRun) {
   }
 }
 
-// ARRANQUE DEL SERVIDOR: solo cuando se ejecuta directamente (nunca en tests)
-if (isDirectRun) {
+// Sirve frontend solo en producción
+if (process.env.NODE_ENV !== 'test') {
+  const frontend = path.join(__dirname, '../frontend');
+  app.use(express.static(frontend));
+  app.get('*', (_, res) => res.sendFile(path.join(frontend, 'index.html')));
+}
+
+// Solo arranca si es ejecución directa
+if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
-    console.log(`Health: http://localhost:${PORT}/health`);
+    console.log(`API + Frontend en puerto ${PORT}`);
   });
 }
 
-module.exports = app; 
+module.exports = app;
