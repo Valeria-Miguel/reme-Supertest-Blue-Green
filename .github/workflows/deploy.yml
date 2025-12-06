@@ -1,4 +1,4 @@
-name: CI + Blue-Green Deployment - Frutas
+name: CI + Blue-Green Deployment - Backend Frutas
 
 on:
   push:
@@ -41,26 +41,23 @@ jobs:
           tags: ghcr.io/valeria-miguel/reme-supertest-blue-green:latest
 
   deploy:
-    name: Blue-Green deploy (VPS)
+    name: Blue-Green deploy (VPS Backend)
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-
-      - name: SSH to VPS and deploy
+      - name: SSH to VPS and deploy backend
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}           # ← CAMBIADO
-          username: ${{ secrets.USERNAME }}   # ← CAMBIADO
-          key: ${{ secrets.KEY }}             # ← CAMBIADO
-          port: ${{ secrets.PORT }}           # ← CAMBIADO
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
           script: |
             set -e
             cd ${{ secrets.APP_PATH }}
-
             IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
-            docker pull $IMAGE
 
             # Detectar entorno activo
             ACTIVE_PORT=$(grep -o "300[12]" /etc/nginx/sites-available/app.conf | head -1 || echo "3001")
@@ -69,19 +66,13 @@ jobs:
               NEW="green"
               NEW_PORT=3002
               NEW_CONTAINER="frutas-green"
-              NEW_FRONTEND="frontend-green"
             else
               NEW="blue"
               NEW_PORT=3001
               NEW_CONTAINER="frutas-blue"
-              NEW_FRONTEND="frontend-blue"
             fi
 
             echo "Deploying $NEW on port $NEW_PORT"
-
-            # Blue-Green del frontend
-            rm -rf $NEW_FRONTEND
-            cp -r frontend $NEW_FRONTEND
 
             # Backend contenedor
             docker rm -f $NEW_CONTAINER 2>/dev/null || true
