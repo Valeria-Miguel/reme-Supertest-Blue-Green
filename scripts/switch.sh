@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
-NGINX_CONF="/etc/nginx/sites-available/app.conf"
+
+NGINX_CONF="/etc/nginx/conf.d/app.conf"
+TARGET_CONTAINER="nginx_proxy_reme"
+
 if [ "$1" = "blue" ]; then
   TARGET_PORT=3100
 elif [ "$1" = "green" ]; then
@@ -10,9 +13,8 @@ else
   exit 1
 fi
 
-sudo cp $NGINX_CONF $NGINX_CONF.bak
-sudo sed -i "/upstream app_upstream {/,/}/s/server 127.0.0.1:[0-9]*/server 127.0.0.1:$TARGET_PORT/" $NGINX_CONF
-sudo nginx -t || { echo "nginx config error"; exit 1; }
-sudo systemctl reload nginx
+docker exec $TARGET_CONTAINER sed -i "/upstream reme_upstream {/,/}/s/server 127.0.0.1:[0-9]*/server 127.0.0.1:$TARGET_PORT/" $NGINX_CONF
+docker exec $TARGET_CONTAINER nginx -t
+docker exec $TARGET_CONTAINER nginx -s reload
 
 echo "Switch realizado a $TARGET_PORT"
