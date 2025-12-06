@@ -1,8 +1,6 @@
-// src/index.js  ← ESTA ES LA DEFINITIVA
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -11,66 +9,62 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Datos
+// In-memory data
 let reservations = [];
-const fruits = [
+let fruits = [
   { id: 1, name: 'Manzana', price: 10, available: true },
   { id: 2, name: 'Banana', price: 5, available: true },
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
-// RUTAS API
+// Health (ruta simple: /health)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
 });
 
-app.get('/api/fruits', (req, res) => res.json(fruits));
+// Obtener frutas
+app.get('/api/fruits', (req, res) => {
+  res.json(fruits);
+});
 
+// Crear reserva de una fruta (ejemplo)
 app.post('/api/reservations', (req, res) => {
   const { fruitId, userName, quantity } = req.body;
-  if (!fruitId || !userName || !quantity) return res.status(400).json({ error: 'Faltan campos' });
+  if (!fruitId || !userName || !quantity) {
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  }
   const fruit = fruits.find(f => f.id === fruitId);
   if (!fruit) return res.status(404).json({ error: 'Fruta no encontrada' });
 
-  const reservation = { id: reservations.length + 1, fruitId, userName, quantity, status: 'confirmed', createdAt: new Date().toISOString() };
+  const reservation = {
+    id: reservations.length + 1,
+    fruitId,
+    userName,
+    quantity,
+    status: 'confirmed',
+    createdAt: new Date().toISOString()
+  };
   reservations.push(reservation);
-  return res.status(201).json(reservation);
+  res.status(201).json(reservation);
 });
 
-app.get('/api/reservations', (req, res) => res.json(reservations));
+app.get('/api/reservations', (req, res) => {
+  res.json(reservations);
+});
 
-// FRONTEND: solo si existe la carpeta y no estamos en test
-const isTest = process.env.NODE_ENV === 'test';
-const isDirectRun = require.main === module;
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Error interno del servidor' });
+});
 
-if (!isTest && isDirectRun) {
-  const frontendPath = path.join(__dirname, '../frontend');
-
-  // Solo monta si la carpeta existe (evita crash en contenedor si no hay frontend)
-  try {
-    require('fs').accessSync(frontendPath);
-    app.use(express.static(frontendPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(frontendPath, 'index.html'));
-    });
-    console.log('Frontend servido desde', frontendPath);
-  } catch (e) {
-    console.log('No hay carpeta frontend, solo API');
-  }
-}
-
-// Sirve frontend solo en producción
-if (process.env.NODE_ENV !== 'test') {
-  const frontend = path.join(__dirname, '../frontend');
-  app.use(express.static(frontend));
-  app.get('*', (_, res) => res.sendFile(path.join(frontend, 'index.html')));
-}
-
-// Solo arranca si es ejecución directa
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`API + Frontend en puerto ${PORT}`);
+  const server = app.listen(PORT, () => {
+    console.log('Servidor corriendo en puerto', PORT);
+    console.log('Health check: http://localhost:' + PORT + '/health');
   });
+  module.exports = server;
+} else {
+  module.exports = app;
 }
 
-module.exports = app;
