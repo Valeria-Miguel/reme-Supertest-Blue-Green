@@ -1,26 +1,20 @@
 #!/bin/bash
+set -e
 
-CONF="/etc/nginx/sites-available/app.conf"
+NGINX_CONF="/etc/nginx/sites-available/app.conf"
 
-echo "=== ESTADO BLUE-GREEN DEPLOYMENT ==="
-echo
+if [ "$1" = "blue" ]; then
+  TARGET_PORT=3100
+elif [ "$1" = "green" ]; then
+  TARGET_PORT=3101
+else
+  echo "Uso: ./switch.sh [blue|green]"
+  exit 1
+fi
 
-echo "Contenedores activos:"
-docker ps --filter "name=app-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-echo
+sudo cp $NGINX_CONF $NGINX_CONF.bak
+sudo sed -i "/upstream app_upstream {/,/}/s/server 127.0.0.1:[0-9]*/server 127.0.0.1:$TARGET_PORT/" $NGINX_CONF
+sudo nginx -t || { echo "nginx config error"; exit 1; }
+sudo systemctl reload nginx
 
-echo "Nginx - Upstream activo:"
-grep "server 127.0.0.1" $CONF | head -1
-echo
-
-echo "Health check Blue (3001):"
-curl -s http://127.0.0.1:3001 || echo "No responde"
-echo
-
-echo "Health check Green (3002):"
-curl -s http://127.0.0.1:3002 || echo "No responde"
-echo
-
-echo "Servicio público (Nginx):"
-curl -s http://127.0.0.1/health || echo "Inactivo"
-echo
+echo "Switch realizado a $TARGET_PORT"
