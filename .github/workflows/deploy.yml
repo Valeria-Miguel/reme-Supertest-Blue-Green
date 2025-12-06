@@ -76,10 +76,12 @@ jobs:
             echo "Deploying $NEW on port $NEW_PORT"
 
             # Liberar puerto si está ocupado por cualquier contenedor
-            OCCUPIED=$(docker ps -q --filter "publish=0.0.0.0:$NEW_PORT")
+            # Liberar puerto si está ocupado por cualquier contenedor
+            OCCUPIED=$(docker ps -q --filter "publish=$NEW_PORT")
             if [ -n "$OCCUPIED" ]; then
               docker rm -f $OCCUPIED
             fi
+
 
             docker rm -f $NEW_CONTAINER 2>/dev/null || true
             docker run -d --name $NEW_CONTAINER -p $NEW_PORT:3000 --restart unless-stopped $IMAGE
