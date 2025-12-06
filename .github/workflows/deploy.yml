@@ -96,11 +96,20 @@ jobs:
             echo "Deploying $NEW on port $NEW_PORT"
 
             # Liberar el puerto si está ocupado por cualquier contenedor corriendo
+            # 1) Si el puerto nuevo está ocupado
             OCCUPIED=$(docker ps -q --filter "publish=$NEW_PORT")
             if [ -n "$OCCUPIED" ]; then
               echo "Port $NEW_PORT in use, removing running container(s): $OCCUPIED"
               docker rm -f $OCCUPIED
             fi
+
+            # 2) Si existe cualquier contenedor con ese nombre (corriendo o parado)
+            EXISTING_BY_NAME=$(docker ps -aq --filter "name=$NEW_CONTAINER")
+            if [ -n "$EXISTING_BY_NAME" ]; then
+              echo "Removing old container(s) named $NEW_CONTAINER: $EXISTING_BY_NAME"
+              docker rm -f $EXISTING_BY_NAME
+            fi
+
 
             # Borrar cualquier contenedor (corriendo o parado) con ese nombre
             EXISTING_BY_NAME=$(docker ps -aq --filter "name=$NEW_CONTAINER")
