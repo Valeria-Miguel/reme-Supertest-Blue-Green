@@ -48,6 +48,13 @@ app.post('/api/reservations', (req, res) => {
   res.status(201).json(reservation);
 });
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Backend reme-Supertest-Blue-Green funcionando detrás de Nginx',
+    version: 'dev'
+  });
+});
 app.get('/api/reservations', (req, res) => {
   res.json(reservations);
 });
@@ -67,4 +74,5 @@ if (require.main === module) {
 } else {
   module.exports = app;
 }
+
 
