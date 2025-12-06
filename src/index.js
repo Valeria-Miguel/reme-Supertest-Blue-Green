@@ -1,3 +1,5 @@
+// src/index.js  ← CÓPIALO TAL CUAL
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -9,22 +11,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory data
+// === TUS DATOS ===
 let reservations = [];
-let fruits = [
+const fruits = [
   { id: 1, name: 'Manzana', price: 10, available: true },
   { id: 2, name: 'Banana', price: 5, available: true },
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
-// RUTAS DE LA API (TODAS ANTES DEL CATCH-ALL)
+// === RUTAS API (siempre antes del catch-all) ===
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
 });
 
-app.get('/api/fruits', (req, res) => {
-  res.json(fruits);
-});
+app.get('/api/fruits', (req, res) => res.json(fruits));
 
 app.post('/api/reservations', (req, res) => {
   const { fruitId, userName, quantity } = req.body;
@@ -43,31 +43,26 @@ app.post('/api/reservations', (req, res) => {
     createdAt: new Date().toISOString()
   };
   reservations.push(reservation);
-  res.status(201).json(reservation);
+  return res.status(201).json(reservation);
 });
 
-app.get('/api/reservations', (req, res) => {
-  res.json(reservations);
-});
+app.get('/api/reservations', (req, res) => res.json(reservations));
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Error interno del servidor' });
-});
+// === SOLO SIRVE FRONTEND EN PRODUCCIÓN (no en tests) ===
+if (process.env.NODE_ENV !== 'test') {
+  const frontendPath = path.join(__dirname, '../frontend');
 
-// AQUÍ AL FINAL: Sirve el frontend estático (SPA)
-app.use(express.static(path.join(__dirname, '../frontend')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
-});
+  app.use(express.static(frontendPath));
 
-if (require.main === module) {
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
-    console.log(`Health: http://localhost:${PORT}/health`);
+  // Esta ruta SÓLO se registra cuando NO estamos en tests
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
-  module.exports = server;
-} else {
-  module.exports = app;
 }
+
+// === ARRANQUE ===
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
+
+module.exports = app; // importante para los tests
