@@ -42,7 +42,8 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository_owner }}/reme-supertest-blue-green:latest
+
 
   deploy:
     name: Blue-Green deploy (VPS)
