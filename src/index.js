@@ -59,7 +59,7 @@ app.post('/api/reservations', (req, res) => {
 // 👇 Ruta raíz con color
 app.get('/', (req, res) => {
   res.json({
-    status: 'OK',
+    status: 'OkkkK',
     message: `Backend reme-Supertest-Blue-Green (${APP_COLOR}) detrás de Nginx`,
     version: APP_VERSION
   });
