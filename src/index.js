@@ -17,6 +17,13 @@ let fruits = [
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Backend reme-Supertest-Blue-Green funcionando detrás de Nginx',
+    version: 'dev'
+  });
+});
 // Health (ruta simple: /health)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
@@ -48,13 +55,7 @@ app.post('/api/reservations', (req, res) => {
   res.status(201).json(reservation);
 });
 
-app.get('/', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Backend reme-Supertest-Blue-Green funcionando detrás de Nginx',
-    version: 'dev'
-  });
-});
+
 app.get('/api/reservations', (req, res) => {
   res.json(reservations);
 });
