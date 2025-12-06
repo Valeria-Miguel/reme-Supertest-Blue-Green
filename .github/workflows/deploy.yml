@@ -57,7 +57,7 @@ jobs:
           tags: ghcr.io/valeria-miguel/reme-supertest-blue-green:latest
 
   deploy:
-    name: Blue-Green deploy (VPS)
+    name: Deploy directo en puerto 80 (sin Nginx ni blue-green)
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -72,49 +72,28 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT }}
-
           script: |
             set -e
+            
+            # Ruta donde está tu proyecto en el VPS
             cd ${{ secrets.APP_PATH }} || exit 1
 
             IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
 
-            echo "Pulling image: $IMAGE"
+            echo "Pulling latest image..."
             docker pull $IMAGE
 
-            # Determinar puerto activo de Nginx (Blue/Green)
-            ACTIVE_PORT=$(grep -A1 "upstream app_upstream" /etc/nginx/sites-available/app.conf | grep -o "310[01]" || echo "3100")
+            echo "Parando y eliminando contenedor anterior (si existe)..."
+            docker stop frutas-directo 2>/dev/null || true
+            docker rm frutas-directo 2>/dev/null || true
 
-            if [ "$ACTIVE_PORT" = "3100" ]; then
-              DEPLOY_ENV="green"
-              DEPLOY_PORT=3101
-              CONTAINER_NAME="frutas-green"
-            else
-              DEPLOY_ENV="blue"
-              DEPLOY_PORT=3100
-              CONTAINER_NAME="frutas-blue"
-            fi
-
-            echo "Deploying to $DEPLOY_ENV on port $DEPLOY_PORT"
-
-            # Eliminar contenedor previo si existe
-            docker rm -f $CONTAINER_NAME 2>/dev/null || true
-
-            # Crear nuevo contenedor
+            echo "Levantando nuevo contenedor directo en puerto 80..."
             docker run -d \
-              --name $CONTAINER_NAME \
-              -p $DEPLOY_PORT:3000 \
+              --name frutas-directo \
+              -p 80:3000 \
+              -v /home/dulce/reme-Supertest-Blue-Green/frontend:/app/frontend \
               --restart unless-stopped \
               $IMAGE
 
-            # Esperar y validar health check
-            sleep 5
-
-            if curl -s http://127.0.0.1:$DEPLOY_PORT/health | grep -q 'OK'; then
-              echo "Healthy. Switching Nginx upstream..."
-              ./scripts/switch.sh $DEPLOY_ENV
-            else
-              echo "❌ Health check failed."
-              docker logs $CONTAINER_NAME --tail 200
-              exit 1
-            fi
+            echo "Desplegado exitosamente en http://143.198.23.14"
+            echo "Listo! Tu demo de frutas está en vivo"
