@@ -1,6 +1,6 @@
-
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -17,17 +17,15 @@ let fruits = [
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
-// Health (ruta simple: /health)
+// RUTAS DE LA API (TODAS ANTES DEL CATCH-ALL)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
 });
 
-// Obtener frutas
 app.get('/api/fruits', (req, res) => {
   res.json(fruits);
 });
 
-// Crear reserva de una fruta (ejemplo)
 app.post('/api/reservations', (req, res) => {
   const { fruitId, userName, quantity } = req.body;
   if (!fruitId || !userName || !quantity) {
@@ -58,18 +56,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Error interno del servidor' });
 });
 
+// AQUÍ AL FINAL: Sirve el frontend estático (SPA)
+app.use(express.static(path.join(__dirname, '../frontend')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
 if (require.main === module) {
-  const server = app.listen(PORT, () => {
-    console.log('Servidor corriendo en puerto', PORT);
-    console.log('Health check: http://localhost:' + PORT + '/health');
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Health: http://localhost:${PORT}/health`);
   });
   module.exports = server;
 } else {
   module.exports = app;
 }
-
-// Sirve el frontend estático
-app.use(express.static('/frontend'));
-app.get('*', (req, res) => {
-  res.sendFile('/frontend/index.html');
-});
