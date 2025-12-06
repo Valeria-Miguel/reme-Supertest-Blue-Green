@@ -1,14 +1,26 @@
 #!/bin/bash
-set -e
 
-echo "Contenedores relevantes:"
-docker ps --filter "name=frutas-" --format "table {{.Names}}	{{.Status}}	{{.Ports}}"
+CONF="/etc/nginx/sites-available/app.conf"
 
-echo "Upstream Nginx:"
-grep -A1 "upstream app_upstream" /etc/nginx/sites-available/app.conf | grep "server"
+echo "=== ESTADO BLUE-GREEN DEPLOYMENT ==="
+echo
 
-echo "Health checks:"
-echo -n "Blue (3100): "
-curl -s http://127.0.0.1:3100/health || echo "No responde"
-echo -n "Green (3101): "
-curl -s http://127.0.0.1:3101/health || echo "No responde"
+echo "Contenedores activos:"
+docker ps --filter "name=app-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo
+
+echo "Nginx - Upstream activo:"
+grep "server 127.0.0.1" $CONF | head -1
+echo
+
+echo "Health check Blue (3001):"
+curl -s http://127.0.0.1:3001 || echo "No responde"
+echo
+
+echo "Health check Green (3002):"
+curl -s http://127.0.0.1:3002 || echo "No responde"
+echo
+
+echo "Servicio público (Nginx):"
+curl -s http://127.0.0.1/health || echo "Inactivo"
+echo
