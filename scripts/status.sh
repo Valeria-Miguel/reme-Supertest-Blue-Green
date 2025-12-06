@@ -4,9 +4,9 @@ set -e
 NGINX_CONF="/etc/nginx/sites-available/app.conf"
 
 if [ "$1" = "blue" ]; then
-  TARGET_PORT=3100
+  TARGET_PORT=3001
 elif [ "$1" = "green" ]; then
-  TARGET_PORT=3101
+  TARGET_PORT=3002
 else
   echo "Uso: ./switch.sh [blue|green]"
   exit 1
