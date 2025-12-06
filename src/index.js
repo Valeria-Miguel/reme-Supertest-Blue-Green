@@ -1,3 +1,5 @@
+// src/index.js  ← ESTA ES LA DEFINITIVA
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -9,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// === DATOS Y RUTAS API ===
+// Datos
 let reservations = [];
 const fruits = [
   { id: 1, name: 'Manzana', price: 10, available: true },
@@ -17,6 +19,7 @@ const fruits = [
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
+// RUTAS API
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
 });
@@ -25,7 +28,7 @@ app.get('/api/fruits', (req, res) => res.json(fruits));
 
 app.post('/api/reservations', (req, res) => {
   const { fruitId, userName, quantity } = req.body;
-  if (!fruitId || !userName || !quantity) return res.status(400).json({ error: 'Faltan campos requeridos' });
+  if (!fruitId || !userName || !quantity) return res.status(400).json({ error: 'Faltan campos' });
   const fruit = fruits.find(f => f.id === fruitId);
   if (!fruit) return res.status(404).json({ error: 'Fruta no encontrada' });
 
@@ -36,21 +39,32 @@ app.post('/api/reservations', (req, res) => {
 
 app.get('/api/reservations', (req, res) => res.json(reservations));
 
-// === FRONTEND SOLO EN PRODUCCIÓN ===
-if (process.env.NODE_ENV !== 'test') {
+// FRONTEND: solo si existe la carpeta y no estamos en test
+const isTest = process.env.NODE_ENV === 'test';
+const isDirectRun = require.main === module;
+
+if (!isTest && isDirectRun) {
   const frontendPath = path.join(__dirname, '../frontend');
-  app.use(express.static(frontendPath));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  });
+
+  // Solo monta si la carpeta existe (evita crash en contenedor si no hay frontend)
+  try {
+    require('fs').accessSync(frontendPath);
+    app.use(express.static(frontendPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+    console.log('Frontend servido desde', frontendPath);
+  } catch (e) {
+    console.log('No hay carpeta frontend, solo API');
+  }
 }
 
-// === ARRANQUE DEL SERVIDOR SOLO CUANDO SE EJECUTA DIRECTAMENTE ===
-if (require.main === module) {
+// ARRANQUE DEL SERVIDOR: solo cuando se ejecuta directamente (nunca en tests)
+if (isDirectRun) {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
     console.log(`Health: http://localhost:${PORT}/health`);
   });
 }
 
-module.exports = app; // para los tests
+module.exports = app; 
