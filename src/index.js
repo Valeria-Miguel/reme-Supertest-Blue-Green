@@ -1,10 +1,13 @@
-
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 👇 Nuevo: color y versión desde variables de entorno
+const APP_COLOR = process.env.APP_COLOR || 'unknown';
+const APP_VERSION = process.env.APP_VERSION || 'dev';
 
 app.use(cors());
 app.use(express.json());
@@ -17,16 +20,14 @@ let fruits = [
   { id: 3, name: 'Naranja', price: 8, available: true }
 ];
 
-app.get('/', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Backend reme-Supertest-Blue-Green funcionando ooi',
-    version: 'dev'
-  });
-});
 // Health (ruta simple: /health)
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Servidor funcionando', version: process.env.APP_VERSION || 'dev' });
+  res.json({
+    status: 'OK',
+    message: 'Servidor funcionando',
+    color: APP_COLOR,
+    version: APP_VERSION
+  });
 });
 
 // Obtener frutas
@@ -55,7 +56,16 @@ app.post('/api/reservations', (req, res) => {
   res.status(201).json(reservation);
 });
 
+// 👇 Ruta raíz con color
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: `Backend reme-Supertest-Blue-Green (${APP_COLOR}) detrás de Nginx`,
+    version: APP_VERSION
+  });
+});
 
+// Listar reservas
 app.get('/api/reservations', (req, res) => {
   res.json(reservations);
 });
@@ -75,5 +85,3 @@ if (require.main === module) {
 } else {
   module.exports = app;
 }
-
-

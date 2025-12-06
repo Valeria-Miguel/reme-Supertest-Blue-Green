@@ -100,6 +100,14 @@ jobs:
             docker run -d \
               --name $NEW_CONTAINER \
               -p $NEW_PORT:3000 \
+              -e APP_COLOR=$NEW \
+              -e APP_VERSION="dev" \
+              --restart unless-stopped \
+              $IMAGE
+            # Levantar nuevo contenedor
+            docker run -d \
+              --name $NEW_CONTAINER \
+              -p $NEW_PORT:3000 \
               --restart unless-stopped \
               $IMAGE
 
