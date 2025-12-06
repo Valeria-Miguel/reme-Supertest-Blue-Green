@@ -33,7 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
-    # 🔥 ESTE BLOQUE ES EL QUE PERMITE PUBLICAR EN GHCR
     permissions:
       contents: read
       packages: write
@@ -53,11 +52,10 @@ jobs:
         with:
           context: .
           push: true
-          # 🔥 IMAGEN FINAL (todo minúsculas)
           tags: ghcr.io/valeria-miguel/reme-supertest-blue-green:latest
 
   deploy:
-    name: Blue-Green deploy (VPS)
+    name: Blue-Green deploy (GCP)
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -65,13 +63,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH to VPS and deploy
+      - name: SSH to GCP and deploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ secrets.GCP_PORT }}
 
           script: |
             set -e
@@ -82,25 +80,31 @@ jobs:
             echo "Pulling image: $IMAGE"
             docker pull $IMAGE
 
-            # Determinar puerto activo de Nginx (Blue/Green)
-            ACTIVE_PORT=$(grep -A1 "upstream app_upstream" /etc/nginx/sites-available/app.conf | grep -o "310[01]" || echo "3100")
+            # Determinar entorno activo de Nginx (blue/green)
+            ACTIVE_PORT=$(grep -o "server 127.0.0.1:300[12]" /etc/nginx/sites-available/app.conf | grep -o "300[12]" || echo "3001")
 
-            if [ "$ACTIVE_PORT" = "3100" ]; then
+            if [ "$ACTIVE_PORT" = "3001" ]; then
               DEPLOY_ENV="green"
-              DEPLOY_PORT=3101
+              DEPLOY_PORT=3002
               CONTAINER_NAME="frutas-green"
+              FRONTEND_FOLDER="frontend-green"
             else
               DEPLOY_ENV="blue"
-              DEPLOY_PORT=3100
+              DEPLOY_PORT=3001
               CONTAINER_NAME="frutas-blue"
+              FRONTEND_FOLDER="frontend-blue"
             fi
 
             echo "Deploying to $DEPLOY_ENV on port $DEPLOY_PORT"
 
+            # Copiar frontend al nuevo entorno (Blue-Green para frontend)
+            rm -rf $FRONTEND_FOLDER
+            cp -r frontend $FRONTEND_FOLDER
+
             # Eliminar contenedor previo si existe
             docker rm -f $CONTAINER_NAME 2>/dev/null || true
 
-            # Crear nuevo contenedor
+            # Crear nuevo contenedor para backend
             docker run -d \
               --name $CONTAINER_NAME \
               -p $DEPLOY_PORT:3000 \

@@ -1,46 +1,37 @@
 #!/bin/bash
 set -e
 
-ENVIRONMENT=$1
+ENV=$1
 IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
 
-if [ "$ENVIRONMENT" == "blue" ]; then
-  PORT=3100
-  CONTAINER_NAME="frutas-blue"
-elif [ "$ENVIRONMENT" == "green" ]; then
-  PORT=3101
-  CONTAINER_NAME="frutas-green"
+if [ "$ENV" = "blue" ]; then
+  PORT=3001
+  CONTAINER="frutas-blue"
+  FRONTEND="frontend-blue"
 else
-  echo "Usage: ./deploy.sh [blue|green]"
-  exit 1
+  PORT=3002
+  CONTAINER="frutas-green"
+  FRONTEND="frontend-green"
 fi
 
-echo "Desplegando $ENVIRONMENT en puerto $PORT"
+echo "Deploying $ENV → puerto $PORT, frontend en $FRONTEND"
 
-# Eliminar contenedor previo si existe
-docker rm -f $CONTAINER_NAME 2>/dev/null || true
+# Blue-Green para frontend
+rm -rf /home/dulce/reme-Supertest-Blue-Green/$FRONTEND
+cp -r /home/dulce/reme-Supertest-Blue-Green/frontend /home/dulce/reme-Supertest-Blue-Green/$FRONTEND
 
-# Descargar imagen
-docker pull $IMAGE || true
+# Backend contenedor
+docker rm -f $CONTAINER 2>/dev/null || true
+docker pull $IMAGE
+docker run -d --name $CONTAINER -p $PORT:3000 --restart unless-stopped $IMAGE
 
-# Crear nuevo contenedor
-docker run -d \
-  --name $CONTAINER_NAME \
-  -p $PORT:3000 \
-  --restart unless-stopped \
-  $IMAGE
+sleep 8
 
-# Esperar a que la app se levante
-sleep 5
-
-# Health check
-if curl -s http://127.0.0.1:$PORT/health | grep -q 'OK'; then
-  echo "Healthy. Switching Nginx upstream..."
-  ./switch.sh $ENVIRONMENT
+if curl -sf http://127.0.0.1:$PORT/health; then
+  echo "Healthy → switching"
+  ./scripts/switch.sh $ENV
 else
-  echo "❌ Health check failed."
-  docker logs $CONTAINER_NAME --tail 200
+  echo "Health failed"
+  docker logs $CONTAINER --tail 50
   exit 1
 fi
-
-echo "Deploy de $ENVIRONMENT completado."
