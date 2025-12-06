@@ -1,0 +1,25 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
+
+h1 {
+    color: #0979ff;
+}
+
+button {
+    padding: 8px 16px;
+    margin: 8px 0;
+    cursor: pointer;
+}
+
+#version-box {
+    background: #eef;
+    padding: 10px;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+li {
+    margin: 4px 0;
+}

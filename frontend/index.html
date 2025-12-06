@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Frutas - Blue/Green Demo</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <h1>🍏 Frutas - Blue/Green Deployment</h1>
+
+    <div id="version-box">
+        <strong>Versión activa:</strong>
+        <span id="version"></span>
+    </div>
+
+    <hr />
+
+    <section>
+        <h2>Listado de frutas</h2>
+        <button onclick="getFruits()">Cargar frutas</button>
+        <ul id="fruits"></ul>
+    </section>
+
+    <section>
+        <h2>Crear reserva</h2>
+        <input id="fruitId" placeholder="ID de fruta" />
+        <input id="userName" placeholder="Tu nombre" />
+        <input id="quantity" placeholder="Cantidad" />
+        <button onclick="createReservation()">Enviar</button>
+        <p id="reservationResult"></p>
+    </section>
+
+    <script src="app.js"></script>
+</body>
+</html>

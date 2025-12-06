@@ -1,0 +1,92 @@
+
+name: CI + Blue-Green Deployment - Frutas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    name: Tests (Jest + Supertest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps
+        run: npm ci
+      - name: Run lint
+        run: npm run lint || true
+      - name: Run tests
+        run: npm test
+
+  build-and-push:
+    name: Build and push image to GHCR
+    needs: test-backend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+
+  deploy:
+    name: Blue-Green deploy (VPS)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: SSH to VPS and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            cd ${{ secrets.APP_PATH }} || exit 1
+            echo "Downloading image from GHCR..."
+            docker pull ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+            # Determine active port
+            ACTIVE_PORT=$(grep -A1 "upstream app_upstream" /etc/nginx/sites-available/app.conf | grep -o "310[01]" || echo "3100")
+            if [ "$ACTIVE_PORT" = "3100" ]; then
+              DEPLOY_ENV="green"
+              DEPLOY_PORT=3101
+              CONTAINER_NAME="frutas-green"
+            else
+              DEPLOY_ENV="blue"
+              DEPLOY_PORT=3100
+              CONTAINER_NAME="frutas-blue"
+            fi
+            echo "Deploying $DEPLOY_ENV on port $DEPLOY_PORT"
+            # Stop existing same-name container
+            docker rm -f $CONTAINER_NAME 2>/dev/null || true
+            # Run new container from GHCR image
+            docker run -d --name $CONTAINER_NAME -p $DEPLOY_PORT:3000 --restart unless-stopped ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+            # Wait and health check
+            sleep 5
+            if curl -s http://127.0.0.1:$DEPLOY_PORT/health | grep -q 'OK'; then
+              echo "Healthy. Switching Nginx upstream"
+              ./scripts/switch.sh $DEPLOY_ENV
+            else
+              echo "Health check failed. Exiting with error"
+              docker logs $CONTAINER_NAME --tail 200
+              exit 1
+            fi
