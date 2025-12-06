@@ -15,6 +15,13 @@ fi
 echo "Deploying $ENV → puerto $PORT"
 
 # Backend contenedor
+# Liberar el puerto si está ocupado por cualquier contenedor
+OCCUPIED=$(docker ps -q --filter "publish=0.0.0.0:$PORT")
+
+if [ -n "$OCCUPIED" ]; then
+  docker rm -f $OCCUPIED
+fi
+
 docker rm -f $CONTAINER 2>/dev/null || true
 docker pull $IMAGE
 docker run -d --name $CONTAINER -p $PORT:3000 --restart unless-stopped $IMAGE

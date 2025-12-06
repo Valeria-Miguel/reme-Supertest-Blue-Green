@@ -1,4 +1,4 @@
-const API_URL = "http://143.198.23.14"; // tu VPS (sin /api)
+const API_URL = window.location.origin;
 
 async function loadVersion() {
     const res = await fetch(`${API_URL}/health`);
@@ -6,7 +6,6 @@ async function loadVersion() {
     document.getElementById("version").textContent = data.version;
 }
 loadVersion();
-
 
 async function getFruits() {
     const res = await fetch(`${API_URL}/api/fruits`);
@@ -16,7 +15,7 @@ async function getFruits() {
 
     data.forEach(f => {
         const li = document.createElement("li");
-        li.textContent = `${f.id} — ${f.name} ($${f.price})`;
+        li.textContent = `${f.id} - ${f.name} ($${f.price})`;
         list.appendChild(li);
     });
 }
