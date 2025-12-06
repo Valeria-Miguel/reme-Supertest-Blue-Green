@@ -12,14 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
+
       - name: Install deps
         run: npm ci
+
       - name: Run lint
         run: npm run lint || true
+
       - name: Run tests
         run: npm test
 
@@ -28,12 +32,14 @@ jobs:
     needs: test-backend
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+
+    # 🔥 ESTE BLOQUE ES EL QUE PERMITE PUBLICAR EN GHCR
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set lowercase owner
-        id: vars
-        run: echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -47,16 +53,17 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ steps.vars.outputs.owner_lc }}/reme-supertest-blue-green:latest
+          # 🔥 IMAGEN FINAL (todo minúsculas)
+          tags: ghcr.io/valeria-miguel/reme-supertest-blue-green:latest
 
   deploy:
     name: Blue-Green deploy (VPS)
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: SSH to VPS and deploy
         uses: appleboy/ssh-action@master
@@ -65,15 +72,17 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT }}
+
           script: |
             set -e
             cd ${{ secrets.APP_PATH }} || exit 1
 
-            IMAGE="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]' | tr -d '-')/reme-supertest-blue-green:latest"
+            IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
 
             echo "Pulling image: $IMAGE"
             docker pull $IMAGE
 
+            # Determinar puerto activo de Nginx (Blue/Green)
             ACTIVE_PORT=$(grep -A1 "upstream app_upstream" /etc/nginx/sites-available/app.conf | grep -o "310[01]" || echo "3100")
 
             if [ "$ACTIVE_PORT" = "3100" ]; then
@@ -86,23 +95,26 @@ jobs:
               CONTAINER_NAME="frutas-blue"
             fi
 
-            echo "Deploying to $DEPLOY_ENV (port $DEPLOY_PORT)"
+            echo "Deploying to $DEPLOY_ENV on port $DEPLOY_PORT"
 
+            # Eliminar contenedor previo si existe
             docker rm -f $CONTAINER_NAME 2>/dev/null || true
 
+            # Crear nuevo contenedor
             docker run -d \
               --name $CONTAINER_NAME \
               -p $DEPLOY_PORT:3000 \
               --restart unless-stopped \
               $IMAGE
 
+            # Esperar y validar health check
             sleep 5
 
             if curl -s http://127.0.0.1:$DEPLOY_PORT/health | grep -q 'OK'; then
-              echo "Healthy. Switching Nginx upstream"
+              echo "Healthy. Switching Nginx upstream..."
               ./scripts/switch.sh $DEPLOY_ENV
             else
-              echo "Health check failed"
+              echo "❌ Health check failed."
               docker logs $CONTAINER_NAME --tail 200
               exit 1
             fi
