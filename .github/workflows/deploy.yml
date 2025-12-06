@@ -12,113 +12,88 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
-
-      - name: Install deps
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
-
-      - name: Run tests
-        run: npm test
+      - run: npm ci
+      - run: npm run lint || true
+      - run: npm test
 
   build-and-push:
     name: Build and push image to GHCR
     needs: test-backend
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v2
+      - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v4
+      - uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: ghcr.io/valeria-miguel/reme-supertest-blue-green:latest
 
   deploy:
-    name: Blue-Green deploy (GCP)
+    name: Blue-Green deploy (VPS)
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH to GCP and deploy
+      - name: SSH to VPS and deploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.GCP_HOST }}
-          username: ${{ secrets.GCP_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.GCP_PORT }}
-
+          host: ${{ secrets.HOST }}           # ← CAMBIADO
+          username: ${{ secrets.USERNAME }}   # ← CAMBIADO
+          key: ${{ secrets.KEY }}             # ← CAMBIADO
+          port: ${{ secrets.PORT }}           # ← CAMBIADO
           script: |
             set -e
-            cd ${{ secrets.APP_PATH }} || exit 1
+            cd ${{ secrets.APP_PATH }}
 
             IMAGE="ghcr.io/valeria-miguel/reme-supertest-blue-green:latest"
-
-            echo "Pulling image: $IMAGE"
             docker pull $IMAGE
 
-            # Determinar entorno activo de Nginx (blue/green)
-            ACTIVE_PORT=$(grep -o "server 127.0.0.1:300[12]" /etc/nginx/sites-available/app.conf | grep -o "300[12]" || echo "3001")
+            # Detectar entorno activo
+            ACTIVE_PORT=$(grep -o "300[12]" /etc/nginx/sites-available/app.conf | head -1 || echo "3001")
 
             if [ "$ACTIVE_PORT" = "3001" ]; then
-              DEPLOY_ENV="green"
-              DEPLOY_PORT=3002
-              CONTAINER_NAME="frutas-green"
-              FRONTEND_FOLDER="frontend-green"
+              NEW="green"
+              NEW_PORT=3002
+              NEW_CONTAINER="frutas-green"
+              NEW_FRONTEND="frontend-green"
             else
-              DEPLOY_ENV="blue"
-              DEPLOY_PORT=3001
-              CONTAINER_NAME="frutas-blue"
-              FRONTEND_FOLDER="frontend-blue"
+              NEW="blue"
+              NEW_PORT=3001
+              NEW_CONTAINER="frutas-blue"
+              NEW_FRONTEND="frontend-blue"
             fi
 
-            echo "Deploying to $DEPLOY_ENV on port $DEPLOY_PORT"
+            echo "Deploying $NEW on port $NEW_PORT"
 
-            # Copiar frontend al nuevo entorno (Blue-Green para frontend)
-            rm -rf $FRONTEND_FOLDER
-            cp -r frontend $FRONTEND_FOLDER
+            # Blue-Green del frontend
+            rm -rf $NEW_FRONTEND
+            cp -r frontend $NEW_FRONTEND
 
-            # Eliminar contenedor previo si existe
-            docker rm -f $CONTAINER_NAME 2>/dev/null || true
+            # Backend contenedor
+            docker rm -f $NEW_CONTAINER 2>/dev/null || true
+            docker run -d --name $NEW_CONTAINER -p $NEW_PORT:3000 --restart unless-stopped $IMAGE
 
-            # Crear nuevo contenedor para backend
-            docker run -d \
-              --name $CONTAINER_NAME \
-              -p $DEPLOY_PORT:3000 \
-              --restart unless-stopped \
-              $IMAGE
+            sleep 8
 
-            # Esperar y validar health check
-            sleep 5
-
-            if curl -s http://127.0.0.1:$DEPLOY_PORT/health | grep -q 'OK'; then
-              echo "Healthy. Switching Nginx upstream..."
-              ./scripts/switch.sh $DEPLOY_ENV
+            if curl -sf http://127.0.0.1:$NEW_PORT/health; then
+              echo "Healthy → switching to $NEW"
+              ./scripts/switch.sh $NEW
             else
-              echo "❌ Health check failed."
-              docker logs $CONTAINER_NAME --tail 200
+              echo "Health failed → rollback"
+              ./scripts/rollback.sh
               exit 1
             fi
